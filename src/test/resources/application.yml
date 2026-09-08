@@ -1,0 +1,4 @@
+# 測試執行一律啟用 test profile，套用 application-test.yml（H2）
+spring:
+  profiles:
+    active: test

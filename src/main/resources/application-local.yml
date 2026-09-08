@@ -1,0 +1,13 @@
+# 本機開發環境：PostgreSQL（見 ADR-0003）
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/lifepremium
+    username: lifepremium
+    password: lifepremium
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true

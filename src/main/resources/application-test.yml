@@ -1,0 +1,14 @@
+# 測試環境：H2 In-Memory（PostgreSQL 相容模式），取代 ADR-0003 之 PostgreSQL
+# 見 ADR-0006「測試環境資料庫替代方案」
+spring:
+  datasource:
+    url: jdbc:h2:mem:lifepremium;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: true
