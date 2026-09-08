@@ -9,7 +9,7 @@
 |---|-------|---------|------|---------|
 | 0 | （前置）需求輸入 | 2026-09-08 | ✅ 完成 | [sdlc/inputs/LIFE-PREMIUM-requirements.md](inputs/LIFE-PREMIUM-requirements.md) |
 | ① | `doc-to-markdown` | — | ⏭️ 略過 | 需求已為 Markdown，無需轉換（見下方說明） |
-| ② | `generate-fsd` | 進行中 | 🔄 | `sdlc/fsd/output/FSD-LIFE-v1.0.md` |
+| ② | `generate-fsd` | 2026-09-08 | ✅ 完成 | [FSD-LIFE-v1.0.md](fsd/output/FSD-LIFE-v1.0.md)、[premium-calculation.feature](fsd/output/features/premium-calculation.feature) |
 | ③ | `generate-sd` | 待執行 | ⏳ | `sdlc/sd/output/SD-LIFE-v1.0.md` + ADR + Task List |
 | ④ | `springboot-codegen` | 待執行 | ⏳ | `src/` |
 | ⑤ | `test-report` | 待執行 | ⏳ | `sdlc/test/output/TEST-REPORT-LIFE-v1.0.md` |
