@@ -71,6 +71,52 @@ Session 啟動
 
 想看每個 Skill 更詳細的設計理念（含 Kiro → Copilot 的對照與移植決策），請見 [SKILL-DESIGN.md](SKILL-DESIGN.md)。
 
+### 5. 兩個關鍵的「省 Token」設計：docling 與 ArchUnit
+
+前面提到的漸進式揭露只解決了「載入 Skill 說明」的 token 消耗，但**執行 Skill 過程中**還有兩個更燒 token 的環節，
+本專案分別用 docling 和 ArchUnit 這兩個「確定性工具」取代 LLM，把 LLM 留給真正需要判斷力的工作：
+
+#### (1) docling — 把「讀文件」這件事從 LLM 手上拿走
+
+`doc-to-markdown` Skill 面對的問題：原始需求文件常常是 PDF、Word、Excel、PPT。
+如果直接把整份 PDF 丟給 LLM 讀取，會發生兩個問題：
+
+- **Token 爆炸**：PDF 內的表格、版面、圖片都要先被模型「看懂」再轉換成文字理解，一份幾十頁的規格書
+  可能吃掉數萬 token，而且每次重新分析都要再燒一次。
+- **機密外洩風險**：若使用雲端 OCR/文件理解 API，文件內容等於上傳到第三方服務。
+
+`docling`（[DS4SD/docling](https://github.com/DS4SD/docling)）是一個**本機執行**的文件結構化解析工具，
+專門處理 PDF 的表格、標題階層、版面配置，把 PDF/Word/Excel/PPT 轉成結構清楚的 Markdown（掃描件則走內建 OCR）。
+關鍵在於：**這一步完全不需要呼叫 LLM**——docling 是傳統的文件解析程式（規則 + 電腦視覺模型跑在本機），
+輸出的 Markdown 檔案這時候才會被後續 `generate-fsd` 等 Skill 讀取。
+
+效果：LLM 只需要讀「已經整理好的 Markdown 純文字」，不用重複花 token 去理解 PDF 版面與圖片；
+且文件全程留在本機，不上雲端。詳見 [`.github/skills/doc-to-markdown/SKILL.md`](.github/skills/doc-to-markdown/SKILL.md)。
+
+#### (2) ArchUnit — 把「檢查程式碼結構」這件事從 LLM 手上拿走
+
+`code-review` Skill 面對的問題：程式碼審查裡有一大類規則其實是「機械化、非黑即白」的，例如：
+
+- Controller 不可以直接依賴 Repository（分層依賴方向）
+- Service 實作類別命名必須以 `ServiceImpl` 結尾
+- package 之間不可以有循環依賴
+
+這類規則若讓 LLM 逐檔案讀程式碼判斷，token 消耗會隨檔案數量線性增加，而且 LLM 的判斷還可能不穩定
+（同一份程式碼兩次審查給出不同結論）。
+
+`ArchUnit`（[ArchUnit](https://www.archunit.org/)）是一個 Java 函式庫，可以把「分層依賴」「命名慣例」
+「循環依賴」這些架構規則寫成**真正會被 JVM 執行的單元測試**（例如 `ArchitectureTest.java`）。
+規則只要寫一次，之後每次 `./mvnw test` 就會用編譯器等級的確定性去驗證，結果永遠一致、不消耗任何 LLM token。
+
+效果：`code-review` Skill 因此設計成兩階段分工——
+**Phase 1 結構檢查交給 ArchUnit**（0 token，結果確定），
+**Phase 2 才讓 LLM 專注審查 ArchUnit 驗不出來的部分**（業務邏輯正確性、資安意圖、輸入驗證缺漏），
+LLM 不必再逐行檢查「Controller 有沒有依賴 Repository」這種可以用程式碼直接證明的事。
+詳見 [`.github/skills/code-review/SKILL.md`](.github/skills/code-review/SKILL.md)。
+
+> **共同原則**：能用確定性工具（本機文件解析器、單元測試框架）驗證或轉換的事，就不要讓 LLM 做；
+> LLM 的 token 預算應該留給「需要理解語意、無法寫成規則」的判斷，例如業務邏輯是否正確、資安意圖是否合理。
+
 ## SDLC 每個步驟所需的 Skills、輸入與輸出
 
 下圖是完整的執行流程，虛線代表需要人工確認才能繼續的 **HITL（Human-in-the-loop）** 關卡：
