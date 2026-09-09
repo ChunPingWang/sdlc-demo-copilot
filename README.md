@@ -184,7 +184,87 @@ sdlc-demo-copilot/
 
 ## MVP 案例：壽險保費試算
 
-沿用原 repo 的業務情境與規則（BR-001 ~ BR-005），詳見 [sdlc/inputs/LIFE-PREMIUM-requirements.md](sdlc/inputs/LIFE-PREMIUM-requirements.md)。
+沿用原 repo（[sdlc-demo-kiro](https://github.com/ChunPingWang/sdlc-demo-kiro)）的業務情境與規則，詳見
+[sdlc/inputs/LIFE-PREMIUM-requirements.md](sdlc/inputs/LIFE-PREMIUM-requirements.md)。
+
+### 業務情境
+
+壽險業務員或訪客輸入被保人基本資料（年齡、性別、保額、繳費年期），系統即時計算年繳與月繳保費，協助投保決策。
+
+### 核心業務規則
+
+| 規則 | 說明 |
+|------|------|
+| BR-001 | 被保人年齡 0～70 歲 |
+| BR-002 | 保額 100～5,000 萬元 |
+| BR-003 | 繳費年期：10 / 20 / 30 / 99 年 |
+| BR-004 | 年繳保費 = ROUND(保額 ÷ 1000 × 費率) |
+| BR-005 | 月繳保費 = ROUND(年繳 ÷ 12 × 1.03) |
+
+### 計算範例
+
+| 條件 | 值 |
+|------|---|
+| 商品 | LIFE-WL-01（終身壽險） |
+| 年齡 / 性別 | 35 歲 / 男性 |
+| 保額 | 1,000 萬元 |
+| 繳費年期 | 20 年 |
+| 費率 | 12.50（每千元） |
+| **年繳保費** | **125,000 元** |
+| **月繳保費** | **10,729 元** |
+
+### 試算 API 範例
+
+```bash
+curl -X POST http://localhost:8080/api/v1/premium/calculate \
+  -H "Content-Type: application/json" \
+  -H "X-Agent-Id: 00000000-0000-0000-0000-000000000001" \
+  -d '{
+    "productCode": "LIFE-WL-01",
+    "age": 35,
+    "gender": "M",
+    "insuredAmount": 1000,
+    "paymentPeriod": 20
+  }'
+```
+
+預期回應：
+
+```json
+{
+  "code": "SUCCESS",
+  "data": {
+    "productCode": "LIFE-WL-01",
+    "insuredAmount": 1000,
+    "paymentPeriod": 20,
+    "rateUsed": 12.50,
+    "annualPremium": 125000,
+    "monthlyPremium": 10729
+  },
+  "timestamp": "2026-09-07T03:00:00Z"
+}
+```
+
+> 本專案驗證環境未安裝 Docker / PostgreSQL / Redis，`test` profile 改用 H2 In-Memory 並停用 Redis
+> 快取層，詳見 [ADR-0006](sdlc/adr/output/ADR-0006-測試資料庫替代方案.md)；正式環境仍依 SD 文件採
+> PostgreSQL + Redis Cache-Aside。
+
+## HITL（Human-in-the-Loop）確認點總覽
+
+全流程共有 **5 個 HITL 確認點**，確保關鍵決策有人工把關：
+
+```
+SDLC 流程                    HITL 確認點              確認重點
+─────────────────────────────────────────────────────────────────
+/generate-fsd Phase 1   →   ⏸ FSD 主體確認       架構邊界、功能完整性
+              Phase 2   →   ⏸ Gherkin 確認       測試情境覆蓋率、業務規則
+/generate-sd  Phase 1   →   ⏸ SD + ADR 確認      雙向：架構師輸入決策 + 審核核准 ADR（HITL-1）
+              Phase 2   →   ⏸ Task List 確認     任務清單正確性（HITL-2）
+/springboot-codegen     →   ⏸ 測試案例確認       Red 狀態、邊界值、測試資料
+```
+
+實作程式碼（Green）為**全自動**，無需人工確認，由測試套件自動驗收；`test-report`、`code-review`、
+`markdown-to-word` 為產出後的自動化步驟，`code-review` 若偵測到 Blocker 會告警並可回饋修正。
 
 ## 驗證流程
 
@@ -206,13 +286,35 @@ sdlc-demo-copilot/
 
 ## 快速開始
 
+### 前置需求
+
+- Java 17+
+- Maven 3.9+（或使用內附 Maven Wrapper）
+
+### 執行測試
+
 ```bash
-# 執行單元測試
+# 單元測試
 ./mvnw test -Dgroups="unit"
 
-# 執行全部測試（含 Cucumber BDD、ArchUnit）
+# 全部測試（含 Cucumber BDD、ArchUnit、覆蓋率報告）
 ./mvnw test
 
-# 啟動應用程式（測試/本機用 H2，profile=local 對接 PostgreSQL）
-./mvnw spring-boot:run -Dspring-boot.run.profiles=test
+# 架構測試（ArchUnit）
+./mvnw test -Dtest="ArchitectureTest"
+
+# 全部測試（Windows PowerShell）
+.\mvnw.cmd test
 ```
+
+### 啟動應用程式
+
+```bash
+# 測試/本機用 H2（無需額外依賴）
+./mvnw spring-boot:run -Dspring-boot.run.profiles=test
+
+# 對接 PostgreSQL + Redis（正式環境設定）
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+API 文件：http://localhost:8080/swagger-ui.html
